@@ -1,0 +1,866 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>TIMAN - Penembak Ajaib vs Buto Ijo</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800;900&family=Press+Start+2P&display=swap" rel="stylesheet">
+    
+    <style>
+        * {
+            user-select: none;
+            -webkit-user-select: none;
+            box-sizing: border-box;
+            touch-action: manipulation;
+        }
+        body {
+            font-family: 'Outfit', sans-serif;
+            background-color: #020617;
+            color: #f8fafc;
+            overflow: hidden;
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            width: 100vw;
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+        .btn-action {
+            transition: all 0.1s ease;
+            box-shadow: 0 5px 0 rgba(0,0,0,0.4);
+        }
+        .btn-action:active {
+            transform: translateY(3px);
+            box-shadow: 0 2px 0 rgba(0,0,0,0.4);
+        }
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(8px);
+            border: 2px solid rgba(255, 255, 255, 0.12);
+        }
+        .glow-green {
+            box-shadow: 0 0 15px rgba(34, 197, 94, 0.5);
+        }
+        .glow-red {
+            box-shadow: 0 0 15px rgba(239, 68, 68, 0.5);
+        }
+    </style>
+</head>
+<body class="relative w-screen h-screen overflow-hidden bg-slate-950">
+
+    <!-- Game Canvas -->
+    <canvas id="gameCanvas" class="absolute inset-0 z-0"></canvas>
+
+    <!-- Top HUD Bar -->
+    <div id="hud" class="absolute top-0 left-0 right-0 z-10 p-3 md:p-4 flex justify-between items-center pointer-events-none hidden">
+        <!-- Player HP & Score -->
+        <div class="flex items-center gap-3">
+            <!-- HP Bar -->
+            <div class="glass-panel px-3 py-2 rounded-2xl flex items-center gap-2">
+                <i class="fa-solid fa-heart text-rose-500 text-xl animate-pulse"></i>
+                <div class="w-24 md:w-32 bg-slate-800 h-3.5 rounded-full overflow-hidden p-0.5 border border-slate-700">
+                    <div id="hpBar" class="bg-gradient-to-r from-rose-500 to-emerald-400 h-full rounded-full transition-all duration-200" style="width: 100%;"></div>
+                </div>
+            </div>
+
+            <!-- Score & Weapon -->
+            <div class="glass-panel px-3 py-2 rounded-2xl flex items-center gap-3">
+                <i class="fa-solid fa-trophy text-amber-400 text-lg"></i>
+                <div>
+                    <div class="text-[10px] text-slate-400 font-bold uppercase">Skor</div>
+                    <div id="hudScore" class="text-base md:text-xl font-black text-amber-300">0</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Boss Health Bar (When Boss Appears) -->
+        <div id="bossHpContainer" class="hidden flex-col items-center glass-panel px-4 py-2 rounded-2xl w-48 md:w-72 border-rose-500/50">
+            <div class="flex justify-between w-full text-xs font-black text-rose-400 mb-1">
+                <span><i class="fa-solid fa-dragon"></i> BOSS BUTO IJO</span>
+                <span id="bossHpLabel">100%</span>
+            </div>
+            <div class="w-full bg-slate-900 h-3 rounded-full overflow-hidden p-0.5 border border-rose-950">
+                <div id="bossHpBar" class="bg-gradient-to-r from-rose-600 via-amber-500 to-emerald-400 h-full rounded-full transition-all duration-100" style="width: 100%;"></div>
+            </div>
+        </div>
+
+        <!-- Controls / Pause -->
+        <div class="pointer-events-auto flex gap-2">
+            <button id="btnSound" class="glass-panel w-10 h-10 rounded-xl flex items-center justify-center text-slate-200 hover:text-white">
+                <i id="soundIcon" class="fa-solid fa-volume-high"></i>
+            </button>
+            <button id="btnPause" class="glass-panel w-10 h-10 rounded-xl flex items-center justify-center text-slate-200 hover:text-white">
+                <i class="fa-solid fa-pause"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- Active Weapon Indicator -->
+    <div id="weaponHud" class="absolute top-16 left-3 z-10 glass-panel px-3 py-1.5 rounded-xl text-xs font-bold text-emerald-300 pointer-events-none hidden flex items-center gap-2">
+        <span>Senjata:</span>
+        <span id="weaponName" class="text-white bg-emerald-600 px-2 py-0.5 rounded-lg">🌱 Biji Timun</span>
+    </div>
+
+    <!-- On-Screen Controls Overlay (Works for Mouse & Touch) -->
+    <div id="mobileControls" class="absolute bottom-4 left-4 right-4 z-10 flex justify-between items-end pointer-events-none hidden">
+        <!-- Left D-Pad Navigation Buttons -->
+        <div class="relative w-40 h-40 pointer-events-auto bg-slate-900/80 p-2 rounded-full border-2 border-emerald-500/40 shadow-2xl backdrop-blur-md flex items-center justify-center select-none">
+            <!-- Up Button -->
+            <button id="btnUp" class="btn-action absolute top-2 w-11 h-11 bg-slate-800 text-emerald-400 rounded-xl flex items-center justify-center text-xl shadow-md border border-slate-700 transition-all active:scale-95 select-none">
+                <i class="fa-solid fa-caret-up"></i>
+            </button>
+            <!-- Left Button -->
+            <button id="btnLeft" class="btn-action absolute left-2 w-11 h-11 bg-slate-800 text-emerald-400 rounded-xl flex items-center justify-center text-xl shadow-md border border-slate-700 transition-all active:scale-95 select-none">
+                <i class="fa-solid fa-caret-left"></i>
+            </button>
+            <!-- Center Indicator -->
+            <div class="w-8 h-8 rounded-full bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-[10px] text-emerald-300 font-black pointer-events-none">
+                TIMAN
+            </div>
+            <!-- Right Button -->
+            <button id="btnRight" class="btn-action absolute right-2 w-11 h-11 bg-slate-800 text-emerald-400 rounded-xl flex items-center justify-center text-xl shadow-md border border-slate-700 transition-all active:scale-95 select-none">
+                <i class="fa-solid fa-caret-right"></i>
+            </button>
+            <!-- Down Button -->
+            <button id="btnDown" class="btn-action absolute bottom-2 w-11 h-11 bg-slate-800 text-emerald-400 rounded-xl flex items-center justify-center text-xl shadow-md border border-slate-700 transition-all active:scale-95 select-none">
+                <i class="fa-solid fa-caret-down"></i>
+            </button>
+        </div>
+
+        <!-- Right Fire & Bomb Action Buttons -->
+        <div class="flex flex-col gap-3 pointer-events-auto items-center">
+            <button id="btnBomb" class="btn-action w-16 h-16 bg-amber-600 hover:bg-amber-500 border-2 border-amber-300 text-white rounded-2xl flex flex-col items-center justify-center text-xs font-black shadow-lg active:scale-95 transition-all select-none">
+                <span class="text-xl">🌋</span>
+                <span class="text-[10px]">BOM</span>
+            </button>
+            <button id="btnShoot" class="btn-action w-20 h-20 bg-emerald-600 hover:bg-emerald-500 border-2 border-emerald-300 text-white rounded-3xl flex flex-col items-center justify-center text-xs font-black shadow-lg active:scale-95 glow-green transition-all select-none">
+                <i class="fa-solid fa-crosshairs text-2xl mb-0.5"></i>
+                <span class="text-[11px]">TEMBAK</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- MAIN MENU OVERLAY -->
+    <div id="mainMenu" class="absolute inset-0 z-20 flex items-center justify-center bg-slate-950/85 backdrop-blur-md p-4">
+        <div class="max-w-md w-full glass-panel p-6 md:p-8 rounded-3xl text-center border border-emerald-500/40 shadow-2xl relative">
+            <div class="w-16 h-16 bg-emerald-500/20 text-emerald-400 rounded-2xl flex items-center justify-center text-3xl mx-auto mb-3 border border-emerald-500/30">
+                🏹
+            </div>
+            <h1 class="text-3xl md:text-5xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-teal-300 to-amber-300 mb-2">
+                TIMAN
+            </h1>
+            <p class="text-xs md:text-sm text-slate-300 font-medium mb-6">
+                Game Tembak-Tembakan Ajaib! Gerakkan Timan, tembak pasukan monster & kalahkan Boss Raksasa Buto Ijo!
+            </p>
+
+            <!-- Best Score -->
+            <div class="bg-slate-900/80 p-3 rounded-2xl border border-slate-800 mb-6 flex justify-between items-center">
+                <span class="text-xs text-slate-400 font-bold">Skor Tertinggi:</span>
+                <span id="bestScore" class="text-xl font-black text-amber-400">0</span>
+            </div>
+
+            <!-- Start Button -->
+            <button onclick="startGame()" class="btn-action w-full py-4 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-black text-lg md:text-xl rounded-2xl glow-green flex items-center justify-center gap-3">
+                <i class="fa-solid fa-play text-xl"></i> MULAI MAIN
+            </button>
+
+            <!-- Easy Instructions -->
+            <div class="mt-6 text-left bg-slate-900/60 p-3.5 rounded-2xl border border-slate-800 text-xs space-y-1.5 text-slate-300">
+                <div class="font-bold text-emerald-400 mb-1 flex items-center gap-1">
+                    <i class="fa-solid fa-circle-info"></i> Cara Bermain Sangat Mudah:
+                </div>
+                <div>🎮 <strong>Gerak:</strong> Tombol Panah Layar / Keyboard WASD</div>
+                <div>🔫 <strong>Tembak:</strong> Otomatis / Klik Tombol TEMBAK / Spacebar</div>
+                <div>🎁 <strong>Item Ajaib:</strong> Ambil Biji, Jarum, Garam & Terasi yang jatuh dari udara!</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- GAME OVER / WIN MODAL -->
+    <div id="endModal" class="absolute inset-0 z-30 flex items-center justify-center bg-slate-950/90 backdrop-blur-md p-4 hidden">
+        <div class="max-w-md w-full glass-panel p-6 rounded-3xl text-center border shadow-2xl relative" id="endCard">
+            <div id="endIcon" class="text-6xl mb-2">🏆</div>
+            <h2 id="endTitle" class="text-3xl font-black text-emerald-400 mb-1">MENANG SANGAT HEBAT!</h2>
+            <p id="endDesc" class="text-slate-300 text-xs md:text-sm mb-6">Timan berhasil mengalahkan Buto Ijo!</p>
+
+            <div class="bg-slate-900/80 p-4 rounded-2xl border border-slate-800 space-y-2 mb-6 text-sm">
+                <div class="flex justify-between items-center">
+                    <span class="text-slate-400">Total Skor:</span>
+                    <span id="endScore" class="text-2xl font-black text-amber-400">0</span>
+                </div>
+            </div>
+
+            <button onclick="startGame()" class="btn-action w-full py-4 bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-extrabold text-lg rounded-2xl glow-green flex items-center justify-center gap-2">
+                <i class="fa-solid fa-rotate-right"></i> MAIN LAGI
+            </button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Game state
+        let gameState = 'MENU'; // 'MENU', 'PLAYING', 'PAUSED', 'GAMEOVER', 'WIN'
+        let lastTime = 0;
+        let score = 0;
+        let bestScore = parseInt(localStorage.getItem('timan_shooter_best') || '0');
+
+        // Audio Engine
+        let audioCtx = null;
+        let soundEnabled = true;
+
+        function initAudio() {
+            if (!audioCtx) {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                audioCtx = new AudioContext();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        function playSound(type) {
+            if (!soundEnabled || !audioCtx) return;
+            try {
+                const now = audioCtx.currentTime;
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+
+                if (type === 'shoot') {
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(600, now);
+                    osc.frequency.exponentialRampToValueAtTime(150, now + 0.08);
+                    gain.gain.setValueAtTime(0.15, now);
+                    gain.gain.linearRampToValueAtTime(0.01, now + 0.08);
+                    osc.start(now);
+                    osc.stop(now + 0.08);
+                } else if (type === 'hit') {
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(200, now);
+                    osc.frequency.linearRampToValueAtTime(60, now + 0.1);
+                    gain.gain.setValueAtTime(0.2, now);
+                    gain.gain.linearRampToValueAtTime(0.01, now + 0.1);
+                    osc.start(now);
+                    osc.stop(now + 0.1);
+                } else if (type === 'powerup') {
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(400, now);
+                    osc.frequency.exponentialRampToValueAtTime(900, now + 0.2);
+                    gain.gain.setValueAtTime(0.25, now);
+                    gain.gain.linearRampToValueAtTime(0.01, now + 0.2);
+                    osc.start(now);
+                    osc.stop(now + 0.2);
+                } else if (type === 'explosion') {
+                    osc.type = 'square';
+                    osc.frequency.setValueAtTime(100, now);
+                    osc.frequency.linearRampToValueAtTime(30, now + 0.3);
+                    gain.gain.setValueAtTime(0.3, now);
+                    gain.gain.linearRampToValueAtTime(0.01, now + 0.3);
+                    osc.start(now);
+                    osc.stop(now + 0.3);
+                }
+            } catch(e) {}
+        }
+
+        // Screen Resizing
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        // Player (Timan)
+        const player = {
+            x: 100,
+            y: 200,
+            width: 46,
+            height: 46,
+            speed: 6,
+            hp: 100,
+            maxHp: 100,
+            weapon: 'SEEDS', // 'SEEDS', 'NEEDLE', 'SALT', 'TERASI'
+            weaponTimer: 0,
+            shootCooldown: 0
+        };
+
+        // Boss (Buto Ijo)
+        const boss = {
+            active: false,
+            x: 0,
+            y: 0,
+            width: 130,
+            height: 140,
+            hp: 300,
+            maxHp: 300,
+            vy: 3,
+            shootTimer: 0
+        };
+
+        // Lists
+        let bullets = [];
+        let bossBullets = [];
+        let enemies = [];
+        let powerups = [];
+        let particles = [];
+        let floatingTexts = [];
+
+        // Input Handling
+        const keys = {};
+
+        window.addEventListener('keydown', (e) => {
+            initAudio();
+            keys[e.code] = true;
+            if (e.code === 'Space') {
+                e.preventDefault();
+            }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            keys[e.code] = false;
+        });
+
+        // Control Binding Function supporting both Mouse & Touch events
+        function bindControl(id, code) {
+            const el = document.getElementById(id);
+            if (!el) return;
+
+            const start = (e) => {
+                if (e.cancelable) e.preventDefault();
+                initAudio();
+                keys[code] = true;
+                el.classList.add('bg-emerald-500', 'text-white', 'scale-95');
+            };
+
+            const stop = (e) => {
+                if (e.cancelable) e.preventDefault();
+                keys[code] = false;
+                el.classList.remove('bg-emerald-500', 'text-white', 'scale-95');
+            };
+
+            // Mouse events for desktop click/hold
+            el.addEventListener('mousedown', start);
+            el.addEventListener('mouseup', stop);
+            el.addEventListener('mouseleave', stop);
+
+            // Touch events for mobile screens
+            el.addEventListener('touchstart', start, { passive: false });
+            el.addEventListener('touchend', stop, { passive: false });
+            el.addEventListener('touchcancel', stop, { passive: false });
+        }
+
+        bindControl('btnUp', 'ArrowUp');
+        bindControl('btnDown', 'ArrowDown');
+        bindControl('btnLeft', 'ArrowLeft');
+        bindControl('btnRight', 'ArrowRight');
+        bindControl('btnShoot', 'Space');
+        bindControl('btnBomb', 'KeyB');
+
+        function updatePlayer() {
+            // Movement
+            if (keys['ArrowUp'] || keys['KeyW']) player.y -= player.speed;
+            if (keys['ArrowDown'] || keys['KeyS']) player.y += player.speed;
+            if (keys['ArrowLeft'] || keys['KeyA']) player.x -= player.speed;
+            if (keys['ArrowRight'] || keys['KeyD']) player.x += player.speed;
+
+            // Boundaries
+            player.x = Math.max(20, Math.min(canvas.width - 100, player.x));
+            player.y = Math.max(20, Math.min(canvas.height - 80, player.y));
+
+            // Weapon Timer
+            if (player.weaponTimer > 0) {
+                player.weaponTimer--;
+                if (player.weaponTimer <= 0) {
+                    player.weapon = 'SEEDS';
+                    updateWeaponHud();
+                }
+            }
+
+            // Auto-shoot or manual key shoot
+            player.shootCooldown--;
+            if (player.shootCooldown <= 0) {
+                shootBullet();
+            }
+        }
+
+        function shootBullet() {
+            playSound('shoot');
+
+            if (player.weapon === 'SEEDS') { // Normal Cucumbers
+                player.shootCooldown = 12;
+                bullets.push({
+                    x: player.x + player.width,
+                    y: player.y + player.height / 2 - 4,
+                    vx: 12,
+                    vy: 0,
+                    size: 8,
+                    color: '#22c55e',
+                    damage: 15
+                });
+            } else if (player.weapon === 'NEEDLE') { // Rapid Needles
+                player.shootCooldown = 6;
+                bullets.push({
+                    x: player.x + player.width,
+                    y: player.y + player.height / 2 - 2,
+                    vx: 16,
+                    vy: (Math.random() - 0.5) * 2,
+                    size: 5,
+                    color: '#06b6d4',
+                    damage: 10
+                });
+            } else if (player.weapon === 'SALT') { // Spread Shot
+                player.shootCooldown = 18;
+                for (let angle = -0.2; angle <= 0.2; angle += 0.2) {
+                    bullets.push({
+                        x: player.x + player.width,
+                        y: player.y + player.height / 2,
+                        vx: Math.cos(angle) * 12,
+                        vy: Math.sin(angle) * 12,
+                        size: 9,
+                        color: '#3b82f6',
+                        damage: 18
+                    });
+                }
+            } else if (player.weapon === 'TERASI') { // Explosive Bomb
+                player.shootCooldown = 25;
+                bullets.push({
+                    x: player.x + player.width,
+                    y: player.y + player.height / 2,
+                    vx: 10,
+                    vy: 0,
+                    size: 14,
+                    color: '#f59e0b',
+                    damage: 40,
+                    isBomb: true
+                });
+            }
+        }
+
+        let spawnTimer = 0;
+
+        function updateEnemies() {
+            spawnTimer++;
+            // Spawn normal enemies
+            if (!boss.active && spawnTimer % 45 === 0) {
+                enemies.push({
+                    x: canvas.width + 30,
+                    y: Math.random() * (canvas.height - 120) + 30,
+                    width: 38,
+                    height: 38,
+                    speed: Math.random() * 2 + 3,
+                    hp: 25,
+                    color: '#ef4444',
+                    type: Math.random() > 0.5 ? 'BAT' : 'GOBLIN'
+                });
+            }
+
+            // Spawn Boss after score > 200
+            if (score >= 200 && !boss.active) {
+                boss.active = true;
+                boss.x = canvas.width - 180;
+                boss.y = canvas.height / 2 - 70;
+                boss.hp = boss.maxHp;
+                document.getElementById('bossHpContainer').classList.remove('hidden');
+                addFloatingText("👹 BOSS BUTO IJO MUNCUL!", canvas.width / 2, 100, '#ef4444');
+            }
+
+            // Update Boss Logic
+            if (boss.active) {
+                boss.y += boss.vy;
+                if (boss.y <= 40 || boss.y >= canvas.height - 180) {
+                    boss.vy *= -1;
+                }
+
+                boss.shootTimer++;
+                if (boss.shootTimer % 60 === 0) {
+                    // Boss shoots dark fireballs
+                    bossBullets.push({
+                        x: boss.x,
+                        y: boss.y + boss.height / 2,
+                        vx: -7,
+                        vy: (player.y - boss.y) * 0.015,
+                        size: 12,
+                        color: '#dc2626'
+                    });
+                }
+            }
+
+            // Move enemies
+            for (let i = enemies.length - 1; i >= 0; i--) {
+                const e = enemies[i];
+                e.x -= e.speed;
+
+                // Collision with player
+                if (checkCollision(player, e)) {
+                    player.hp -= 15;
+                    playSound('hit');
+                    createSparks(e.x, e.y, '#ef4444', 10);
+                    enemies.splice(i, 1);
+                    if (player.hp <= 0) triggerEndGame(false);
+                    continue;
+                }
+
+                if (e.x < -50) enemies.splice(i, 1);
+            }
+        }
+
+        function updateBullets() {
+            // Player Bullets
+            for (let i = bullets.length - 1; i >= 0; i--) {
+                const b = bullets[i];
+                b.x += b.vx;
+                b.y += b.vy;
+
+                // Hit Enemies
+                let hit = false;
+                for (let j = enemies.length - 1; j >= 0; j--) {
+                    const e = enemies[j];
+                    if (checkCollision({ x: b.x - b.size, y: b.y - b.size, width: b.size * 2, height: b.size * 2 }, e)) {
+                        e.hp -= b.damage;
+                        hit = true;
+                        playSound('hit');
+                        createSparks(b.x, b.y, b.color, 6);
+
+                        if (e.hp <= 0) {
+                            score += 10;
+                            playSound('explosion');
+                            createSparks(e.x, e.y, '#f59e0b', 12);
+
+                            // Random Powerup drop
+                            if (Math.random() < 0.3) {
+                                const types = ['NEEDLE', 'SALT', 'TERASI', 'HEAL'];
+                                powerups.push({
+                                    x: e.x,
+                                    y: e.y,
+                                    type: types[Math.floor(Math.random() * types.length)],
+                                    size: 20
+                                });
+                            }
+                            enemies.splice(j, 1);
+                        }
+                        break;
+                    }
+                }
+
+                // Hit Boss
+                if (!hit && boss.active && checkCollision({ x: b.x - b.size, y: b.y - b.size, width: b.size * 2, height: b.size * 2 }, boss)) {
+                    boss.hp -= b.damage;
+                    hit = true;
+                    playSound('hit');
+                    createSparks(b.x, b.y, '#f59e0b', 8);
+
+                    if (boss.hp <= 0) {
+                        score += 200;
+                        triggerEndGame(true);
+                    }
+                }
+
+                if (hit || b.x > canvas.width + 50) {
+                    bullets.splice(i, 1);
+                }
+            }
+
+            // Boss Bullets
+            for (let i = bossBullets.length - 1; i >= 0; i--) {
+                const bb = bossBullets[i];
+                bb.x += bb.vx;
+                bb.y += bb.vy;
+
+                if (checkCollision({ x: bb.x - bb.size, y: bb.y - bb.size, width: bb.size * 2, height: bb.size * 2 }, player)) {
+                    player.hp -= 20;
+                    playSound('hit');
+                    createSparks(player.x, player.y, '#dc2626', 10);
+                    bossBullets.splice(i, 1);
+                    if (player.hp <= 0) triggerEndGame(false);
+                    continue;
+                }
+
+                if (bb.x < -50) bossBullets.splice(i, 1);
+            }
+
+            // Powerups
+            for (let i = powerups.length - 1; i >= 0; i--) {
+                const p = powerups[i];
+                p.x -= 2;
+
+                if (checkCollision({ x: p.x, y: p.y, width: p.size, height: p.size }, player)) {
+                    playSound('powerup');
+                    if (p.type === 'HEAL') {
+                        player.hp = Math.min(player.maxHp, player.hp + 30);
+                        addFloatingText("+30 HP", player.x, player.y - 20, '#10b981');
+                    } else {
+                        player.weapon = p.type;
+                        player.weaponTimer = 350; // 350 frames duration
+                        updateWeaponHud();
+                        addFloatingText("SENJATA SENJATA!", player.x, player.y - 20, '#f59e0b');
+                    }
+                    powerups.splice(i, 1);
+                    continue;
+                }
+
+                if (p.x < -50) powerups.splice(i, 1);
+            }
+        }
+
+        function render() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // 1. Draw Starry Night Forest Background
+            ctx.fillStyle = '#020617';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Distant Trees
+            ctx.fillStyle = '#0f172a';
+            for (let x = 0; x < canvas.width; x += 80) {
+                ctx.beginPath();
+                ctx.moveTo(x, canvas.height);
+                ctx.lineTo(x + 40, canvas.height - 120);
+                ctx.lineTo(x + 80, canvas.height);
+                ctx.fill();
+            }
+
+            // 2. Draw Powerups
+            powerups.forEach(p => {
+                ctx.save();
+                ctx.fillStyle = p.type === 'HEAL' ? '#ef4444' : '#f59e0b';
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, 14, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#ffffff';
+                ctx.font = '12px sans-serif';
+                ctx.textAlign = 'center';
+                const icon = p.type === 'HEAL' ? '❤️' : (p.type === 'NEEDLE' ? '🪡' : (p.type === 'SALT' ? '🧂' : '🌋'));
+                ctx.fillText(icon, p.x, p.y + 4);
+                ctx.restore();
+            });
+
+            // 3. Draw Player (Timan)
+            ctx.save();
+            ctx.translate(player.x, player.y);
+            // Character body
+            ctx.fillStyle = '#fdba74';
+            ctx.beginPath();
+            ctx.arc(23, 14, 12, 0, Math.PI * 2); // Head
+            ctx.fill();
+
+            ctx.fillStyle = '#047857'; // Clothes
+            ctx.fillRect(11, 24, 24, 20);
+
+            ctx.fillStyle = '#b91c1c'; // Headband
+            ctx.fillRect(11, 6, 24, 5);
+
+            // Slingshot / Gun
+            ctx.fillStyle = '#fbbf24';
+            ctx.fillRect(30, 20, 14, 6);
+            ctx.restore();
+
+            // 4. Draw Enemies
+            enemies.forEach(e => {
+                ctx.save();
+                ctx.fillStyle = e.color;
+                ctx.beginPath();
+                ctx.roundRect(e.x, e.y, e.width, e.height, 8);
+                ctx.fill();
+                // Eyes
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(e.x + 8, e.y + 10, 6, 6);
+                ctx.fillRect(e.x + 22, e.y + 10, 6, 6);
+                ctx.restore();
+            });
+
+            // 5. Draw Boss (Buto Ijo)
+            if (boss.active) {
+                ctx.save();
+                ctx.fillStyle = '#15803d'; // Giant Green skin
+                ctx.beginPath();
+                ctx.roundRect(boss.x, boss.y, boss.width, boss.height, 16);
+                ctx.fill();
+                // Red glowing eyes
+                ctx.fillStyle = '#ef4444';
+                ctx.beginPath();
+                ctx.arc(boss.x + 35, boss.y + 40, 10, 0, Math.PI * 2);
+                ctx.arc(boss.x + 75, boss.y + 40, 10, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+
+            // 6. Draw Bullets
+            bullets.forEach(b => {
+                ctx.fillStyle = b.color;
+                ctx.beginPath();
+                ctx.arc(b.x, b.y, b.size, 0, Math.PI * 2);
+                ctx.fill();
+            });
+
+            bossBullets.forEach(bb => {
+                ctx.fillStyle = bb.color;
+                ctx.beginPath();
+                ctx.arc(bb.x, bb.y, bb.size, 0, Math.PI * 2);
+                ctx.fill();
+            });
+
+            // 7. Particles & Text
+            particles.forEach((p, index) => {
+                p.x += p.vx;
+                p.y += p.vy;
+                p.alpha -= 0.03;
+                if (p.alpha <= 0) particles.splice(index, 1);
+                else {
+                    ctx.save();
+                    ctx.globalAlpha = p.alpha;
+                    ctx.fillStyle = p.color;
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.restore();
+                }
+            });
+
+            floatingTexts.forEach((ft, index) => {
+                ft.y -= 0.8;
+                ft.alpha -= 0.02;
+                if (ft.alpha <= 0) floatingTexts.splice(index, 1);
+                else {
+                    ctx.save();
+                    ctx.globalAlpha = ft.alpha;
+                    ctx.fillStyle = ft.color;
+                    ctx.font = 'bold 16px Outfit, sans-serif';
+                    ctx.fillText(ft.text, ft.x, ft.y);
+                    ctx.restore();
+                }
+            });
+
+            // Update HUD elements
+            document.getElementById('hpBar').style.width = `${Math.max(0, (player.hp / player.maxHp) * 100)}%`;
+            document.getElementById('hudScore').innerText = score;
+            if (boss.active) {
+                const bossPercent = Math.max(0, Math.floor((boss.hp / boss.maxHp) * 100));
+                document.getElementById('bossHpBar').style.width = `${bossPercent}%`;
+                document.getElementById('bossHpLabel').innerText = `${bossPercent}%`;
+            }
+        }
+
+        function checkCollision(r1, r2) {
+            return !(r1.x > r2.x + r2.width ||
+                     r1.x + (r1.width || r1.size) < r2.x ||
+                     r1.y > r2.y + r2.height ||
+                     r1.y + (r1.height || r1.size) < r2.y);
+        }
+
+        function createSparks(x, y, color, count) {
+            for (let i = 0; i < count; i++) {
+                particles.push({
+                    x: x, y: y,
+                    vx: (Math.random() - 0.5) * 6,
+                    vy: (Math.random() - 0.5) * 6,
+                    color: color,
+                    size: Math.random() * 4 + 2,
+                    alpha: 1
+                });
+            }
+        }
+
+        function addFloatingText(text, x, y, color) {
+            floatingTexts.push({ text: text, x: x, y: y, color: color, alpha: 1 });
+        }
+
+        function updateWeaponHud() {
+            const el = document.getElementById('weaponName');
+            if (player.weapon === 'SEEDS') el.innerText = "🌱 Biji Timun";
+            else if (player.weapon === 'NEEDLE') el.innerText = "🪡 Jarum Rapid";
+            else if (player.weapon === 'SALT') el.innerText = "🧂 Garam Spread";
+            else if (player.weapon === 'TERASI') el.innerText = "🌋 Terasi Bomb";
+        }
+
+        function gameLoop(time) {
+            if (gameState === 'PLAYING') {
+                updatePlayer();
+                updateEnemies();
+                updateBullets();
+                render();
+            }
+            requestAnimationFrame(gameLoop);
+        }
+
+        function startGame() {
+            initAudio();
+            gameState = 'PLAYING';
+            score = 0;
+            player.hp = 100;
+            player.x = 80;
+            player.y = canvas.height / 2;
+            player.weapon = 'SEEDS';
+            boss.active = false;
+
+            bullets = [];
+            bossBullets = [];
+            enemies = [];
+            powerups = [];
+            particles = [];
+            floatingTexts = [];
+
+            document.getElementById('mainMenu').classList.add('hidden');
+            document.getElementById('endModal').classList.add('hidden');
+            document.getElementById('hud').classList.remove('hidden');
+            document.getElementById('weaponHud').classList.remove('hidden');
+            document.getElementById('bossHpContainer').classList.add('hidden');
+            document.getElementById('mobileControls').classList.remove('hidden');
+        }
+
+        function triggerEndGame(isWin) {
+            gameState = isWin ? 'WIN' : 'GAMEOVER';
+            if (score > bestScore) {
+                bestScore = score;
+                localStorage.setItem('timan_shooter_best', bestScore);
+            }
+
+            const card = document.getElementById('endCard');
+            const icon = document.getElementById('endIcon');
+            const title = document.getElementById('endTitle');
+            const desc = document.getElementById('endDesc');
+
+            if (isWin) {
+                icon.innerText = '🏆';
+                title.innerText = 'MENANG SANGAT HEBAT!';
+                title.className = 'text-3xl font-black text-emerald-400 mb-1';
+                desc.innerText = 'Timan berhasil mengalahkan Buto Ijo!';
+            } else {
+                icon.innerText = '👹';
+                title.innerText = 'GAME OVER';
+                title.className = 'text-3xl font-black text-rose-500 mb-1';
+                desc.innerText = 'Timan terkena serangan Buto Ijo... Coba lagi!';
+            }
+
+            document.getElementById('endScore').innerText = score;
+            document.getElementById('endModal').classList.remove('hidden');
+        }
+
+        // Toggle Sound & Pause
+        document.getElementById('btnSound').addEventListener('click', () => {
+            soundEnabled = !soundEnabled;
+            document.getElementById('soundIcon').className = soundEnabled ? 'fa-solid fa-volume-high' : 'fa-solid fa-volume-xmark text-rose-400';
+        });
+
+        document.getElementById('btnPause').addEventListener('click', () => {
+            if (gameState === 'PLAYING') gameState = 'PAUSED';
+            else if (gameState === 'PAUSED') gameState = 'PLAYING';
+        });
+
+        window.onload = function() {
+            document.getElementById('bestScore').innerText = bestScore;
+            requestAnimationFrame(gameLoop);
+        };
+    </script>
+</body>
+</html>
